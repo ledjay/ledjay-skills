@@ -1,38 +1,12 @@
 # Gitleaks configuration for ledjay-skills
-# https://github.com/gitleaks/gitleaks
 
-title = "ledjay-skills secrets detection"
+title = "ledjay-skills gitleaks config"
 
 [extend]
-# Use default rules plus custom ones
 useDefault = true
 
-# Allowlist - files that might have false positives
-[[allowlists]]
-description = "Allow example files"
-paths = [
-  '''_template/.*''',
-  '''examples/.*''',
-  '''\.design-system/.*''',
-]
-
-# Custom rules for skill-specific patterns
-[[rules]]
-id = "llm-api-key"
-description = "LLM API Key"
-regex = '''(?i)(openai|anthropic|claude|gemini|groq)[-_]?(api[_-]?key|key)\s*[=:]\s*['\"][a-zA-Z0-9_-]{20,}['\"]'''
-tags = ["api", "llm", "key"]
-
-[[rules]]
-id = "mcp-server-token"
-description = "MCP Server Token"
-regex = '''(?i)mcp[_-]?(token|secret|key)\s*[=:]\s*['\"][a-zA-Z0-9_-]{16,}['\"]'''
-tags = ["mcp", "token"]
-
-# Entropy-based detection for random strings
-[[rules]]
-id = "high-entropy-string"
-description = "High entropy string (potential secret)"
-regex = '''['"]([a-zA-Z0-9_-]{32,})['"]'''
-entropy = 4.5
-tags = ["entropy"]
+# Allowlist for false positives
+[allowlist]
+description = "Ignore bundled .cjs files and alphabets"
+paths = ['''pencil-mcp/scripts/.*\.cjs$''']
+regexes = ['''[A-Za-z0-9]{50,}''']

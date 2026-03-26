@@ -28,7 +28,6 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
   isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
   mod
 ));
-var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
 // node_modules/ajv/dist/compile/codegen/code.js
 var require_code = __commonJS({
@@ -7296,12 +7295,8 @@ var require_cross_spawn = __commonJS({
   }
 });
 
-// pencil.ts
-var pencil_exports = {};
-__export(pencil_exports, {
-  PencilClient: () => PencilClient
-});
-module.exports = __toCommonJS(pencil_exports);
+// pencil-session.ts
+var readline = __toESM(require("readline"), 1);
 
 // node_modules/zod/v3/helpers/util.js
 var util;
@@ -21606,15 +21601,15 @@ var PencilClient = class {
 async function main() {
   const args = process.argv.slice(2);
   const [command, ...rest] = args;
-  const pencil = new PencilClient();
-  await pencil.connect();
+  const pencil2 = new PencilClient();
+  await pencil2.connect();
   try {
     if (command === "list-tools") {
-      const tools = await pencil.listTools();
+      const tools = await pencil2.listTools();
       console.log(JSON.stringify(tools, null, 2));
     } else if (command === "info") {
       const toolName = rest[0];
-      const tools = await pencil.listTools();
+      const tools = await pencil2.listTools();
       const tool = tools.find((t) => t.name === toolName);
       if (tool) {
         console.log(JSON.stringify(tool, null, 2));
@@ -21625,7 +21620,7 @@ async function main() {
     } else if (command === "call") {
       const [toolName, jsonArgs] = rest;
       const parsedArgs = jsonArgs ? JSON.parse(jsonArgs) : {};
-      const result = await pencil.call(toolName, parsedArgs);
+      const result = await pencil2.call(toolName, parsedArgs);
       console.log(JSON.stringify(result, null, 2));
     } else {
       console.error("Usage: pencil <command> [args]");
@@ -21636,7 +21631,7 @@ async function main() {
       process.exit(1);
     }
   } finally {
-    await pencil.disconnect();
+    await pencil2.disconnect();
   }
 }
 var isMainModule = process.argv[1]?.includes("pencil.ts") || process.argv[1]?.includes("pencil.cjs");
@@ -21646,7 +21641,73 @@ if (isMainModule) {
     process.exit(1);
   });
 }
-// Annotate the CommonJS export names for ESM import in node:
-0 && (module.exports = {
-  PencilClient
+
+// pencil-session.ts
+var pencil = new PencilClient();
+var activeFile;
+async function handleCommand(line) {
+  const trimmed = line.trim();
+  if (!trimmed || trimmed.startsWith("#")) {
+    return;
+  }
+  if (trimmed === "quit" || trimmed === "exit") {
+    console.log(JSON.stringify({ success: true, message: "Goodbye!" }));
+    await pencil.disconnect();
+    process.exit(0);
+  }
+  const spaceIndex = trimmed.indexOf(" ");
+  const toolName = spaceIndex > 0 ? trimmed.slice(0, spaceIndex) : trimmed;
+  const argsStr = spaceIndex > 0 ? trimmed.slice(spaceIndex + 1) : "{}";
+  let args;
+  try {
+    args = JSON.parse(argsStr);
+  } catch (e) {
+    console.log(JSON.stringify({ success: false, error: `Invalid JSON: ${e.message}` }));
+    return;
+  }
+  if (activeFile && !args.filePath && toolName !== "open_document") {
+    args.filePath = activeFile;
+  }
+  if (toolName === "open_document" && args.filePath) {
+    activeFile = args.filePath;
+  }
+  try {
+    const result = await pencil.call(toolName, args);
+    const text = result.content?.[0]?.text || "";
+    let capturedIds;
+    if (toolName === "batch_design") {
+      capturedIds = [...text.matchAll(/Inserted node `(\w+)`/g)].map((m) => m[1]);
+    }
+    console.log(JSON.stringify({
+      success: true,
+      tool: toolName,
+      result: text.match(/^\{/) ? JSON.parse(text) : text,
+      capturedIds
+    }));
+  } catch (e) {
+    console.log(JSON.stringify({
+      success: false,
+      tool: toolName,
+      error: e.message
+    }));
+  }
+}
+async function main2() {
+  console.error("[pencil-session] Connecting to Pencil MCP...");
+  await pencil.connect();
+  console.error('[pencil-session] Connected! Type commands (one per line), or "quit" to exit.');
+  console.error('[pencil-session] Format: tool_name {"arg": "value"}');
+  console.log(JSON.stringify({ success: true, message: "Connected" }));
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stderr
+  });
+  for await (const line of rl) {
+    await handleCommand(line);
+  }
+  await pencil.disconnect();
+}
+main2().catch((err) => {
+  console.error("Error:", err.message);
+  process.exit(1);
 });

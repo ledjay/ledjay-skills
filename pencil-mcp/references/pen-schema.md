@@ -1,8 +1,17 @@
 # .pen Format — TypeScript Schema
 
-<!-- last_verified: 2026-03-21 -->
+<!-- last_verified: 2026-03-26 -->
 <!-- sources: docs.pencil.dev/for-developers/the-pen-format (2026-03-10) -->
 <!-- stability: LOW — schema actively evolving, "we reserve the right to introduce breaking changes" -->
+
+> ⚠️ **CRITICAL: This schema is for UNDERSTANDING only — NOT for writing files!**
+> 
+> Writing `.pen` JSON directly will produce an **empty canvas** in Pencil.
+> 
+> **To create content, use MCP tools:** `batch_design`, `set_variables`, etc.
+> 
+> This reference helps you understand the internal structure, debug issues,
+> or parse `.pen` files for analysis.
 
 Authoritative reference from https://docs.pencil.dev/for-developers/the-pen-format
 
@@ -29,187 +38,125 @@ interface Document {
 ## Variable Definition
 
 ```typescript
-// Single value
-{ type: "color", value: "#FF8C00" }
-{ type: "color", value: "$other-var" }
+interface VariableDef {
+  type: "color" | "number" | "string";
+  value: string | number | ConditionalValue[];
+}
 
-// Themed values (last matching theme wins)
-{ type: "color", value: [
-  { value: "#FFFFFF", theme: { Mode: "Light" } },
-  { value: "#000000", theme: { Mode: "Dark" } }
-]}
-
-// Types: "boolean" | "color" | "number" | "string"
-```
-
-**Binding**: Use `$variableName` in any compatible property.
-
-## Core Types
-
-### Entity (base for all)
-
-```typescript
-interface Entity {
-  id: string;               // Unique, no slashes
-  name?: string;            // Display name
-  context?: string;         // Context annotation
-  reusable?: boolean;       // true = component
-  theme?: Theme;            // { axis: value }
-  enabled?: boolean;
-  opacity?: number;         // 0-1
-  rotation?: number;        // Degrees, counter-clockwise
-  flipX?: boolean;
-  flipY?: boolean;
-  x?: number;               // Ignored in flex layout
-  y?: number;               // Ignored in flex layout
-  metadata?: { type: string; [key: string]: any };
+interface ConditionalValue {
+  value: string | number;
+  theme: { [axis: string]: string };  // e.g., {"Mode": "Dark"}
 }
 ```
 
-### Frame (main container)
+## Theming
+
+Multi-axis theming confirmed working (March 2026):
+
+```json
+{
+  "themes": {
+    "Mode": ["Light", "Dark"],
+    "Contrast": ["Normal", "High"]
+  },
+  "variables": {
+    "background": {
+      "type": "color",
+      "value": [
+        {"value": "#FFFFFF", "theme": {"Mode": "Light"}},
+        {"value": "#1A1A1A", "theme": {"Mode": "Dark"}}
+      ]
+    }
+  }
+}
+```
+
+## Frame
 
 ```typescript
-interface Frame extends Entity {
+interface Frame {
+  id: string;
   type: "frame";
-  width?: number | SizingBehavior;   // "fill_container", "fit_content", "fit_content(300)"
-  height?: number | SizingBehavior;
-  cornerRadius?: number | [tl, tr, br, bl];
-  clip?: boolean;                     // Default false
-  fill?: Fill | Fill[];
-  stroke?: Stroke;
-  effect?: Effect | Effect[];
-  layout?: "none" | "vertical" | "horizontal";
+  name?: string;
+  x?: number;
+  y?: number;
+  width?: number | string;  // number or "fill_container"
+  height?: number | string;  // number or "fit_content(n)"
+  layout?: "vertical" | "horizontal";
   gap?: number;
-  padding?: number | [v, h] | [t, r, b, l];
-  justifyContent?: "start" | "center" | "end" | "space_between" | "space_around";
-  alignItems?: "start" | "center" | "end";
-  placeholder?: boolean;
-  slot?: string[];                    // IDs of suggested components
-  children?: Child[];
+  padding?: number | [number, number, number, number];
+  cornerRadius?: number | [number, number, number, number];
+  fill?: string | { type: "image"; url: string };
+  stroke?: { fill: string; thickness: number; align: "inside" | "center" | "outside" };
+  children?: Node[];
+  reusable?: boolean;        // Makes this a component
+  slot?: string[];           // Component IDs for auto-population
 }
 ```
 
-### Text
+## Text
 
 ```typescript
-interface Text extends Entity {
+interface Text {
+  id: string;
   type: "text";
-  content?: string | TextStyle[];
-  fontFamily?: string;
+  content: string;
   fontSize?: number;
-  fontWeight?: string;
-  letterSpacing?: number;
-  fontStyle?: string;
-  underline?: boolean;
-  lineHeight?: number;          // Multiplier on fontSize
+  fontWeight?: number | "normal" | "bold";
+  fontFamily?: string;       // ⚠️ Variables DON'T work here!
   textAlign?: "left" | "center" | "right" | "justify";
-  textAlignVertical?: "top" | "middle" | "bottom";
-  strikethrough?: boolean;
-  href?: string;
   textGrowth?: "auto" | "fixed-width" | "fixed-width-height";
-  // ⚠️ MUST set textGrowth before width/height!
-  width?: number | SizingBehavior;
-  height?: number | SizingBehavior;
-  fill?: Fill | Fill[];
+  fill?: string;
+  x?: number;
+  y?: number;
 }
 ```
 
-### Ref (component instance)
+## Ref (Component Instance)
 
 ```typescript
-interface Ref extends Entity {
+interface Ref {
+  id: string;
   type: "ref";
-  ref: string;                  // ID of source component
-  descendants?: {
-    [idPath: string]:
-      | {}                      // Property overrides (no type/id/children)
-      | { type: ..., ... }      // Full object replacement (has type)
-      | { children: Child[] }   // Children replacement
-  };
-  [key: string]: any;           // Additional overrides on root
+  ref: string;               // ID of the source component
+  name?: string;
+  x?: number;
+  y?: number;
+  width?: number | string;
+  height?: number | string;
+  fill?: string;             // Override
+  stroke?: Stroke;           // Override
+  reusable?: boolean;        // If true, this ref becomes a component itself
+  descendants?: { [nodeId: string]: Partial<Node> };  // Deep overrides
 }
 ```
 
-### IconFont
+## Complete Node Types
 
-```typescript
-interface IconFont extends Entity {
-  type: "icon_font";
-  iconFontName?: string;
-  iconFontFamily?: string;      // "lucide" | "feather" | "Material Symbols *" | "phosphor"
-  weight?: number;              // 100-700 (variable fonts only)
-  width?: number;
-  height?: number;
-  fill?: Fill | Fill[];
-}
-```
+| Type | Description |
+|------|-------------|
+| `frame` | Container, component, or slot |
+| `text` | Text content |
+| `ref` | Component instance |
+| `rectangle` | Rectangle shape |
+| `ellipse` | Circle/oval |
+| `line` | Line |
+| `polygon` | Polygon |
+| `path` | SVG path |
+| `note` | Annotation |
+| `context` | Context setting |
+| `prompt` | AI prompt |
+| `icon_font` | Icon from font (Lucide, etc.) |
 
-### Other types
+## Why Direct JSON Writing Fails
 
-- **Rectangle**: Entity + Size + fill/stroke/cornerRadius
-- **Ellipse**: Entity + Size + fill/stroke + innerRadius/startAngle/sweepAngle
-- **Line**: Entity + Size + stroke
-- **Polygon**: Entity + Size + polygonCount/cornerRadius
-- **Path**: Entity + geometry (SVG path) + fillRule
-- **Group**: Entity + children + optional layout
-- **Note**: Entity + content (non-rendering)
-- **Prompt**: Entity + content + model
-- **Context**: Entity + content
+Pencil's MCP server maintains internal state for:
+- WebSocket connections
+- Active document tracking
+- Variable resolution cache
+- Component relationship graph
 
-## Fill Types
+When you write JSON directly, these internal structures aren't initialized,
+resulting in an empty canvas even though the file "opens" successfully.
 
-```typescript
-type Fill =
-  | string                          // Color: "#FF8C00" or "$var"
-  | { type: "color", color: string, enabled?: boolean, blendMode?: BlendMode }
-  | { type: "gradient", gradientType: "linear"|"radial"|"angular",
-      colors: {color: string, position: number}[],
-      rotation?: number, center?: {x,y}, size?: {width,height} }
-  | { type: "image", url: string, mode?: "stretch"|"fill"|"fit",
-      opacity?: number }
-  | { type: "mesh_gradient", columns?: number, rows?: number,
-      colors?: string[], points?: [...] }
-```
-
-## Effect Types
-
-```typescript
-type Effect =
-  | { type: "blur", radius: number }
-  | { type: "background_blur", radius: number }
-  | { type: "shadow", shadowType: "inner"|"outer",
-      offset?: {x,y}, spread?: number, blur?: number,
-      color?: string, blendMode?: BlendMode }
-```
-
-## Stroke
-
-```typescript
-interface Stroke {
-  align?: "inside" | "center" | "outside";
-  thickness?: number | { top, right, bottom, left };
-  join?: "miter" | "bevel" | "round";
-  cap?: "none" | "round" | "square";
-  dashPattern?: number[];
-  fill?: Fill | Fill[];
-}
-```
-
-## SizingBehavior
-
-```typescript
-// Fixed
-width: 300
-
-// Dynamic
-width: "fill_container"           // Use parent size
-width: "fit_content"              // Use children size
-width: "fit_content(300)"         // Children size, fallback 300
-```
-
-## BlendModes
-
-`"normal"` | `"darken"` | `"multiply"` | `"linearBurn"` | `"colorBurn"` |
-`"light"` | `"screen"` | `"linearDodge"` | `"colorDodge"` | `"overlay"` |
-`"softLight"` | `"hardLight"` | `"difference"` | `"exclusion"` |
-`"hue"` | `"saturation"` | `"color"` | `"luminosity"`
+**Always use MCP tools to create content.**

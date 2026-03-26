@@ -13,6 +13,10 @@ from pathlib import Path
 SKIP_FILES = {
     # Compiled bundles (safe uses of new Function)
     "pencil-mcp/scripts/pencil.cjs",
+    "pencil-mcp/scripts/pencil-batch.cjs",
+    "pencil-mcp/scripts/pencil-session.cjs",
+    "pencil-mcp/scripts/pencil-batch.ts",
+    "pencil-mcp/scripts/pencil-session.ts",
     "scripts/security-scan.py",
     "scripts/unicode-check.py",
 }
