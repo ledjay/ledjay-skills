@@ -1,12 +1,16 @@
 {
   "name": "pencil-mcp-client",
-  "version": "1.0.0",
+  "version": "2.2.0",
   "type": "module",
   "description": "MCP stdio client for Pencil design tool",
   "scripts": {
     "pencil": "node pencil.cjs",
+    "batch": "node pencil-batch.cjs",
+    "session": "node pencil-session.cjs",
     "build": "npx esbuild pencil.ts --bundle --platform=node --target=node20 --format=cjs --outfile=pencil.cjs",
-    "build:all": "npx esbuild pencil.ts helpers.ts --bundle --platform=node --target=node20 --format=cjs --outdir=.",
+    "build:batch": "npx esbuild pencil-batch.ts --bundle --platform=node --target=node20 --format=cjs --outfile=pencil-batch.cjs",
+    "build:session": "npx esbuild pencil-session.ts --bundle --platform=node --target=node20 --format=cjs --outfile=pencil-session.cjs",
+    "build:all": "npm run build && npm run build:batch && npm run build:session",
     "dev": "npx tsx pencil.ts"
   },
   "dependencies": {

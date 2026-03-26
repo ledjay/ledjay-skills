@@ -192,7 +192,12 @@ async function main() {
   }
 }
 
-main().catch((err) => {
-  console.error("Error:", err.message);
-  process.exit(1);
-});
+// Only run main() when executed directly, not when imported
+// @ts-ignore - process.argv[1] may be undefined in some environments
+const isMainModule = process.argv[1]?.includes('pencil.ts') || process.argv[1]?.includes('pencil.cjs');
+if (isMainModule) {
+  main().catch((err) => {
+    console.error("Error:", err.message);
+    process.exit(1);
+  });
+}
