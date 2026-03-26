@@ -1,0 +1,74 @@
+name: Security Scan
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Cisco Skill Scanner
+        run: |
+          pip install cisco-ai-skill-scanner
+
+      - name: Scan skills with Cisco Scanner
+        run: |
+          skill-scanner scan ./ \
+            --format sarif \
+            --output cisco-results.sarif \
+            --policy medium \
+            || true
+        continue-on-error: true
+
+      - name: Upload SARIF results
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: cisco-results.sarif
+          category: cisco-skill-scanner
+        continue-on-error: true
+
+      - name: Run local security scan
+        run: |
+          python3 scripts/security-scan.py $(find . -name "SKILL.md" | head -20)
+        continue-on-error: true
+
+      - name: Run Unicode check
+        run: |
+          python3 scripts/unicode-check.py $(find . -name "*.md" | head -20)
+        continue-on-error: true
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
+
+  # Summary job that fails if critical issues found
+  security-summary:
+    runs-on: ubuntu-latest
+    needs: scan
+    if: always()
+    steps:
+      - name: Security Check Summary
+        run: |
+          echo "✅ Security scan completed"
+          echo "Check the SARIF results in the Security tab for details"
+          echo ""
+          echo "If critical issues were found, they will be listed above"

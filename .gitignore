@@ -17,3 +17,7 @@ build/
 
 # Letta local config
 .letta/
+
+# Security scan results
+*.sarif
+results.sarif

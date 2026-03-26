@@ -1,0 +1,56 @@
+# Lefthook configuration for ledjay-skills
+# https://github.com/evilmartians/lefthook
+
+pre-commit:
+  parallel: true
+  commands:
+    # Security scan for SKILL.md files
+    security-scan-skills:
+      glob: "**/SKILL.md"
+      run: python3 scripts/security-scan.py {staged_files}
+      fail_text: "⚠️ Security issues detected in skill files"
+    
+    # Security scan for scripts (ts, js, cjs, mjs)
+    security-scan-scripts:
+      glob: "**/*.{ts,js,cjs,mjs,sh,py}"
+      run: python3 scripts/security-scan.py --scripts {staged_files}
+      fail_text: "⚠️ Security issues detected in scripts"
+    
+    # Check for hardcoded secrets
+    secrets-check:
+      run: gitleaks protect --staged
+      fail_text: "🔐 Potential secrets detected. Remove or use .gitleaks.toml to allowlist"
+    
+    # Unicode smuggling detection
+    unicode-check:
+      glob: "**/*.md"
+      run: python3 scripts/unicode-check.py {staged_files}
+      fail_text: "🔤 Suspicious Unicode characters detected (potential smuggling)"
+
+pre-push:
+  commands:
+    # Full Cisco Skill Scanner (if available)
+    cisco-scan:
+      run: |
+        if command -v skill-scanner &> /dev/null; then
+          skill-scanner scan ./ --format text
+        else
+          echo "ℹ️ Cisco Skill Scanner not installed. Install with: pip install cisco-ai-skill-scanner"
+        fi
+      fail_text: "🚨 Cisco Skill Scanner detected issues"
+
+# Run on commit message
+commit-msg:
+  commands:
+    # Conventional commit format check
+    commit-format:
+      run: |
+        if grep -qE "^(feat|fix|docs|style|refactor|test|chore|perf|ci|build|revert)(\(.+\))?: .+" {1}; then
+          exit 0
+        else
+          echo "Commit message must follow conventional commits format:"
+          echo "  feat: description"
+          echo "  fix(scope): description"
+          exit 1
+        fi
+      fail_text: "📝 Commit message must follow conventional commits format"
