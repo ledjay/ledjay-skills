@@ -7,7 +7,7 @@ Skills to help AI coding agents work with design — tokens, Pencil, patterns.
 ## Installation
 
 ```bash
-npx skills add jeremiegisserot/ledjay-skills
+npx skills add ledjay/skills
 ```
 
 ## Skills
